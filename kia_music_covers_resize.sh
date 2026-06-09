@@ -20,16 +20,18 @@ process_file() {
 
   echo "→ Obrabiam: $BASENAME"
 
-  # 1) Wyciągnięcie okładki (ffmpeg zapisuje jako 'cover_tmp' bez rozszerzenia)
-  rm -f cover_tmp cover_tmp.jpg cover_tmp.png cover_fixed.jpg
-  ffmpeg -y -i "$FILE" -an -vcodec copy cover_tmp 2>/dev/null
+  rm -f cover_tmp* cover_fixed.jpg
 
-  # 2) Wykrycie formatu okładki
+  # 1) Wyciągnięcie okładki z MJPEG / PNG / WebP / APIC
+  ffmpeg -y -i "$FILE" -map 0:v -c copy cover_tmp 2>/dev/null
+
+  # 2) Wykrycie formatu
   if [ -f cover_tmp ]; then
     MIME=$(file --mime-type -b cover_tmp)
     case "$MIME" in
       image/jpeg) mv cover_tmp cover_tmp.jpg ;;
       image/png) mv cover_tmp cover_tmp.png ;;
+      image/webp) mv cover_tmp cover_tmp.webp ;;
       *) echo "   ⚠️ Nieznany format okładki: $MIME"; rm -f cover_tmp ;;
     esac
   fi
@@ -37,6 +39,8 @@ process_file() {
   # 3) Konwersja do JPG 500x500
   if [ -f cover_tmp.png ]; then
     ffmpeg -y -i cover_tmp.png -vf scale=500:500 cover_fixed.jpg 2>/dev/null
+  elif [ -f cover_tmp.webp ]; then
+    ffmpeg -y -i cover_tmp.webp -vf scale=500:500 cover_fixed.jpg 2>/dev/null
   elif [ -f cover_tmp.jpg ]; then
     ffmpeg -y -i cover_tmp.jpg -vf scale=500:500 cover_fixed.jpg 2>/dev/null
   fi
@@ -57,7 +61,7 @@ process_file() {
   # 7) Wymuszenie ID3v2.3
   id3v2 -2 "$OUTFILE"
 
-  rm -f cover_tmp cover_tmp.jpg cover_tmp.png cover_fixed.jpg
+  rm -f cover_tmp* cover_fixed.jpg
 }
 
 if [ -f "$INPUT" ]; then
